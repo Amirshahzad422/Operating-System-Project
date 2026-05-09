@@ -1,0 +1,142 @@
+OS Project Spring 2026 - Readable Requirements
+
+1) Team and Submission Basics
+- Group size: 3 students (cross-section groups allowed).
+- Build a console-based application.
+- Graphics are optional bonus (+2 marks).
+- Include enough output/visualization in console to show system behavior clearly.
+- Plagiarism is strictly prohibited.
+
+2) Project Goal
+Simulate two neighboring intersections (F10 and F11) with:
+- Concurrent vehicle threads
+- Separate traffic-controller processes
+- Inter-process communication (pipes) between controllers
+- Priority handling for emergency vehicles
+- Parking lot subsystem attached to intersections
+
+3) High-Level System Design
+Intersections:
+- F10 and F11 operate independently.
+- They coordinate especially during emergency movement between intersections.
+
+Vehicles (default: 15):
+- Vehicle types:
+  1. Ambulance
+  2. Firetruck
+  3. Bus
+  4. Car
+  5. Bike
+  6. Tractor
+- Each vehicle is a pthread.
+- Vehicles appear at random intervals.
+- Each vehicle has route intent: straight / left / right.
+- Some non-emergency vehicles may attempt parking before crossing.
+
+Traffic Controllers:
+- One controller per intersection.
+- Controllers are separate processes (created using fork()).
+- Controllers communicate via pipes.
+
+4) Priority and Safety Rules
+Priority order:
+- Highest: Ambulance, Firetruck
+- Medium: Bus
+- Normal/lower: Car, Bike, Tractor
+
+Emergency behavior:
+- Emergency vehicles can preempt normal signal cycles.
+- System must clear route ahead of emergency vehicle.
+- If an ambulance is moving F10 -> F11 (or reverse), one controller informs the other via IPC.
+- Receiving intersection clears path in advance.
+
+Safe crossing constraint:
+- Only non-conflicting movements can proceed at the same time.
+- No collision-producing combinations should be allowed.
+
+5) Parking Lot Subsystem
+Each intersection has a parking lot module with:
+- 10 parking spots (fixed capacity)
+- Bounded waiting queue
+
+Semaphore requirements:
+- Semaphore A: available parking spots (initial value = 10)
+- Semaphore B: available waiting queue slots (bounded queue)
+
+Parking interaction rules:
+- Vehicles that want parking must reserve a wait-slot/spot before entering intersection flow.
+- Vehicles must NEVER block intersection while waiting for parking.
+- Vehicles should request intersection access only when parking availability is confirmed.
+- Emergency vehicles do not use parking logic.
+- Parking logic must not interfere with emergency preemption.
+
+6) Vehicle Metadata (required fields)
+For each vehicle thread, maintain:
+- id
+- type
+- origin
+- destination
+- priority
+- arrival_time
+
+7) Shutdown and Cleanup (mandatory)
+Simulation must stop cleanly:
+- After configurable number of vehicles, OR
+- On SIGINT (Ctrl+C)
+
+Cleanup must include:
+- Stop vehicle spawning
+- Join all threads
+- Release/deallocate pipe resources
+- Release/destroy semaphores and related synchronization objects
+
+8) Rubrics Overview (total = 250)
+- System Architecture (40):
+  Correct fork() design for F10/F11 controllers + reliable bidirectional IPC
+- Concurrency & Threads (30):
+  15 vehicle pthreads with correct metadata handling
+- Parking Logic (40):
+  Correct dual-semaphore parking + no intersection blocking while parking waits
+- Traffic Control (30):
+  Priority rules + non-conflicting safe movement
+- Stability & Cleanup (20):
+  Proper SIGINT handling + graceful shutdown and resource cleanup
+- Viva (Project) (40):
+  Ability to explain implementation
+- Viva (Lab Concepts) (50):
+  Conceptual understanding from labs
+
+9) Suggested Implementation Plan
+Step 1: Build core data model
+- Define enums/structs for vehicle types, priorities, directions, and metadata.
+
+Step 2: Build parking lot module
+- Implement dual semaphores:
+  - spots_sem = 10
+  - queue_sem = bounded waiting capacity
+- Write parking enter/leave functions with thread-safe behavior.
+
+Step 3: Build intersection controller logic
+- Implement signal phases and allowed non-conflicting movement sets.
+- Add emergency preemption hooks.
+
+Step 4: Add process architecture
+- Parent process forks two controller processes (F10 and F11).
+- Set up bidirectional pipes for emergency notifications.
+
+Step 5: Add vehicle thread simulation
+- Spawn vehicles randomly.
+- Each thread decides route and optional parking action (if non-emergency type).
+- Enforce priority and safe crossing constraints.
+
+Step 6: Add cross-intersection emergency coordination
+- When emergency route targets other intersection, send pipe message.
+- Receiving controller clears path and acknowledges readiness.
+
+Step 7: Add graceful shutdown
+- Handle SIGINT.
+- Stop new spawns, join threads, close pipes, destroy semaphores.
+
+Step 8: Testing and demonstration
+- Test normal flow, heavy load, parking saturation, emergency preemption, and Ctrl+C shutdown.
+- Print clear logs showing decisions and state transitions.

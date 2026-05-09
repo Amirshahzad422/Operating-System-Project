@@ -1,0 +1,4 @@
+*.o
+os_project_sim
+os_project_sim_gui
+.DS_Store
